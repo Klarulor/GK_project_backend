@@ -1,13 +1,13 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm i
+RUN npm ci
 
 COPY . .
+RUN chown -R node:node /usr/src/app
 ENV NODE_ENV=development
-WORKDIR /usr/src/app
 
 USER node
 EXPOSE 3300
