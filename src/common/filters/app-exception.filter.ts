@@ -23,7 +23,7 @@ export class AppExceptionFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
     const message =
-      exception instanceof Error ? exception.message : "Unexpected error";
+      exception instanceof Error ? JSON.stringify(exception.message) : "Unexpected error";
 
     this.logException(exception, request, status, message);
 
