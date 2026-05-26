@@ -65,16 +65,12 @@ export class AuthService {
     newUser.email = email;
     newUser.username = username;
     newUser.hashedPassword = await hash(password);
-    newUser.role =
-      (await this.userRepository.count()) === 0
-        ? UserRole.ADMIN
-        : UserRole.USER;
 
     this.logger.log({
       event: "USER_REGISTERED",
       email,
       username,
-      role: newUser.role,
+      role: UserRole.USER,
     });
     await this.userRepository.save(newUser);
   }
