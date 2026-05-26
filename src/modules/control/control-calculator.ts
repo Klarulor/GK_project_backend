@@ -62,8 +62,7 @@ export function resolveControlDecision(
     };
   }
 
-  const targetState = device.isEnabled && device.priceLimit >= priceEurMwh;
-  //console.log(priceEurMwh, device.priceLimit, targetState);
+  const targetState = device.priceLimit >= priceEurMwh;
   return {
     uid: device.uid,
     targetState,

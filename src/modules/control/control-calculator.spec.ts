@@ -23,6 +23,17 @@ describe("control calculator", () => {
     expect(decision.reason).toContain("above");
   });
 
+  it("switches a device on when price is below threshold even if it is currently off", () => {
+    const decision = resolveControlDecision(
+      { ...device, isEnabled: false },
+      50,
+      false,
+    );
+
+    expect(decision.targetState).toBe(true);
+    expect(decision.reason).toContain("within");
+  });
+
   it("keeps critical devices on during vacation mode when price allows it", () => {
     const decision = resolveControlDecision(
       { ...device, isCritical: true },

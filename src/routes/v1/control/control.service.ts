@@ -12,6 +12,7 @@ import {
 import { DevicesGetResponseDto } from "../devices/dto/devices.get.response.dto";
 import { UsersService } from "../users/users.service";
 import { NotificationsService } from "src/modules/notifications/notifications.service";
+import type { ElectricityPrice } from "src/common/types/electricity-price.types";
 
 @Injectable()
 export class ControlService {
@@ -42,13 +43,19 @@ export class ControlService {
     ]);
     const savings = await this.getSavingsReport(user, "day");
 
+    const effectiveCurrentPrice = this.getControlPriceEurMwh(
+      currentPrice.priceEurMwh,
+      user.fixedPriceEurKwh,
+    );
     const decisions = devices.map((device) => ({
       ...resolveControlDecision(
         device,
-        currentPrice.priceEurMwh,
+        effectiveCurrentPrice,
         user.vacationMode,
       ),
       deviceName: device.name,
+      priceEurMwh: effectiveCurrentPrice,
+      priceSource: this.getControlPriceSource(user.fixedPriceEurKwh),
     }));
 
     return {
@@ -65,7 +72,7 @@ export class ControlService {
       savings,
       plannedSavings: calculateSavingsReport(
         devices,
-        forecast.slice(0, 24),
+        this.getControlForecast(forecast.slice(0, 24), user.fixedPriceEurKwh),
         user.fixedPriceEurKwh,
         user.vacationMode,
       ),
@@ -110,6 +117,8 @@ export class ControlService {
       uid: string;
       targetState: boolean;
       reason: string;
+      priceEurMwh: number;
+      priceSource: string;
       changed: boolean;
       error?: string;
     }> = [];
@@ -118,14 +127,23 @@ export class ControlService {
       const price = await this.electricityService.getCurrentPrice(
         device.priceLocation,
       );
+      const controlPriceEurMwh = this.getControlPriceEurMwh(
+        price.priceEurMwh,
+        user.fixedPriceEurKwh,
+      );
       const decision = resolveControlDecision(
         device,
-        price.priceEurMwh,
+        controlPriceEurMwh,
         user.vacationMode,
       );
+      const result = {
+        ...decision,
+        priceEurMwh: controlPriceEurMwh,
+        priceSource: this.getControlPriceSource(user.fixedPriceEurKwh),
+      };
 
       if (device.isEnabled === decision.targetState) {
-        results.push({ ...decision, changed: false });
+        results.push({ ...result, changed: false });
         continue;
       }
 
@@ -135,7 +153,7 @@ export class ControlService {
           decision.targetState,
           device.owner,
           "automation",
-          price.priceEurMwh,
+          controlPriceEurMwh,
           decision.reason,
         );
         await this.notificationsService.send(
@@ -153,9 +171,16 @@ export class ControlService {
               name: device.name,
             },
             details: [
-              { label: "Action", value: decision.targetState ? "Switched on" : "Switched off" },
+              {
+                label: "Action",
+                value: decision.targetState ? "Switched on" : "Switched off",
+              },
               { label: "Reason", value: decision.reason },
-              { label: "Price", value: `${price.priceEurMwh} EUR/MWh` },
+              { label: "Price", value: `${controlPriceEurMwh} EUR/MWh` },
+              {
+                label: "Price source",
+                value: this.getControlPriceSource(user.fixedPriceEurKwh),
+              },
             ],
           },
         );
@@ -165,9 +190,10 @@ export class ControlService {
           uid: device.uid,
           targetState: decision.targetState,
           reason: decision.reason,
-          priceEurMwh: price.priceEurMwh,
+          priceEurMwh: controlPriceEurMwh,
+          priceSource: this.getControlPriceSource(user.fixedPriceEurKwh),
         });
-        results.push({ ...decision, changed: true });
+        results.push({ ...result, changed: true });
       } catch {
         this.logger.error({
           event: "DEVICE_COMMAND_FAILED",
@@ -191,12 +217,15 @@ export class ControlService {
             },
             details: [
               { label: "Reason", value: decision.reason },
-              { label: "Expected state", value: decision.targetState ? "On" : "Off" },
+              {
+                label: "Expected state",
+                value: decision.targetState ? "On" : "Off",
+              },
             ],
           },
         );
         results.push({
-          ...decision,
+          ...result,
           changed: false,
           error: "Device callback failed",
         });
@@ -218,5 +247,30 @@ export class ControlService {
     }
     start.setDate(start.getDate() - 1);
     return start;
+  }
+
+  private getControlPriceEurMwh(
+    exchangePriceEurMwh: number,
+    fixedPriceEurKwh: number,
+  ) {
+    if (fixedPriceEurKwh > 0) return fixedPriceEurKwh * 1000;
+    return exchangePriceEurMwh;
+  }
+
+  private getControlPriceSource(fixedPriceEurKwh: number) {
+    return fixedPriceEurKwh > 0 ? "fixed" : "exchange";
+  }
+
+  private getControlForecast(
+    forecast: ElectricityPrice[],
+    fixedPriceEurKwh: number,
+  ): ElectricityPrice[] {
+    if (fixedPriceEurKwh <= 0) return forecast;
+    const fixedPriceEurMwh = fixedPriceEurKwh * 1000;
+    return forecast.map((price) => ({
+      ...price,
+      priceEurMwh: fixedPriceEurMwh,
+      priceEurKwh: fixedPriceEurKwh,
+    }));
   }
 }
