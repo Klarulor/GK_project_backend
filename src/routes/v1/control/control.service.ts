@@ -13,6 +13,7 @@ import { DevicesGetResponseDto } from "../devices/dto/devices.get.response.dto";
 import { UsersService } from "../users/users.service";
 import { NotificationsService } from "src/modules/notifications/notifications.service";
 import type { ElectricityPrice } from "src/common/types/electricity-price.types";
+import { UserRole } from "src/common/types/enums";
 
 @Injectable()
 export class ControlService {
@@ -112,7 +113,10 @@ export class ControlService {
   }
 
   async runAutomation(user: UserEntity) {
-    const devices = await this.devicesService.getDeviceByUser(user.id);
+    const devices =
+      user.role === UserRole.ADMIN
+        ? await this.devicesService.getDevices(user)
+        : await this.devicesService.getDeviceByUser(user.id);
     const results: Array<{
       uid: string;
       targetState: boolean;

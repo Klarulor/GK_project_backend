@@ -180,6 +180,20 @@ describe("DevicesService", () => {
     expect(metricsService.recordDeviceCommand).toHaveBeenCalledWith(true);
   });
 
+  it("allows admin to command another user's device", async () => {
+    const { service, deviceRepository } = serviceWithMocks();
+
+    const result = await service.sendCommand("device-1", true, {
+      id: 2,
+      role: UserRole.ADMIN,
+    } as never);
+
+    expect(result.isEnabled).toBe(true);
+    expect(deviceRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: "device-1", isEnabled: true }),
+    );
+  });
+
   it("logs failed command when callback does not respond", async () => {
     process.env.MOCK_DEVICES = "false";
     const deviceRepository = {
