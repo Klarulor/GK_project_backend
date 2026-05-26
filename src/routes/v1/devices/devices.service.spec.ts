@@ -14,6 +14,10 @@ const device = {
 };
 
 describe("DevicesService", () => {
+  afterEach(() => {
+    delete process.env.MOCK_DEVICES;
+  });
+
   function serviceWithMocks(
     overrides: Partial<{
       deviceRepository: Record<string, unknown>;
@@ -131,6 +135,7 @@ describe("DevicesService", () => {
   });
 
   it("returns failed device test when callback fails", async () => {
+    process.env.MOCK_DEVICES = "false";
     const { service } = serviceWithMocks({
       httpService: {
         get: jest.fn().mockReturnValue(throwError(() => new Error("offline"))),
@@ -176,6 +181,7 @@ describe("DevicesService", () => {
   });
 
   it("logs failed command when callback does not respond", async () => {
+    process.env.MOCK_DEVICES = "false";
     const deviceRepository = {
       findOne: jest.fn().mockResolvedValue({ ...device }),
       save: jest.fn(),

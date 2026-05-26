@@ -81,15 +81,18 @@ export class DevicesService {
     if (dto.name !== undefined) target.name = dto.name;
     if (dto.description !== undefined) target.description = dto.description;
     if (dto.callbackUrl !== undefined) target.callbackUrl = dto.callbackUrl;
-    if (dto.connectionType !== undefined) target.connectionType = dto.connectionType;
+    if (dto.connectionType !== undefined)
+      target.connectionType = dto.connectionType;
     if (dto.priceLimit !== undefined) target.priceLimit = dto.priceLimit;
-    if (dto.priceLocation !== undefined) target.priceLocation = dto.priceLocation;
-    if (dto.overrideValue !== undefined) target.overrideState = dto.overrideValue === null ? 0 : dto.overrideValue ? 1 : 2;
+    if (dto.priceLocation !== undefined)
+      target.priceLocation = dto.priceLocation;
+    if (dto.overrideValue !== undefined)
+      target.overrideState =
+        dto.overrideValue === null ? 0 : dto.overrideValue ? 1 : 2;
     if (dto.powerKw !== undefined) target.powerKw = dto.powerKw;
     if (dto.isCritical !== undefined) target.isCritical = dto.isCritical;
     return await this.deviceRepository.save(target);
-    
-}
+  }
 
   async sendCommand(
     uid: string,
@@ -101,27 +104,27 @@ export class DevicesService {
   ): Promise<DeviceEntity> {
     const target = await this.getDevice(uid, requester);
 
-    try {
-      await firstValueFrom(
-        this.httpService.post(
-          target.callbackUrl,
-          {
-            uid: target.uid,
-            enabled: targetState,
-            source,
-          },
-          { timeout: 5000 },
-        ),
-      );
-    } catch {
-        if(process.env.MOCK_DEVICES !== "true"){
-            await this.logCommand(
-            target,
-            targetState,
-            source,
-            priceEurMwh,
-            message ?? "Device callback did not respond",
-            false,
+    if (!this.isMockDevicesEnabled()) {
+      try {
+        await firstValueFrom(
+          this.httpService.post(
+            target.callbackUrl,
+            {
+              uid: target.uid,
+              enabled: targetState,
+              source,
+            },
+            { timeout: 5000 },
+          ),
+        );
+      } catch {
+        await this.logCommand(
+          target,
+          targetState,
+          source,
+          priceEurMwh,
+          message ?? "Device callback did not respond",
+          false,
         );
         this.metricsService.recordDeviceCommand(false);
         this.logger.error({
@@ -132,8 +135,10 @@ export class DevicesService {
           source,
           priceEurMwh,
         });
-            throw new ServiceUnavailableException("Device callback did not respond");
-        }
+        throw new ServiceUnavailableException(
+          "Device callback did not respond",
+        );
+      }
     }
 
     target.isEnabled = targetState;
@@ -183,14 +188,14 @@ export class DevicesService {
     requester: UserEntity,
   ): Promise<{ ok: boolean }> {
     const target = await this.getDevice(uid, requester);
-    console.log(process.env.MOCK_DEVICES);
-    if(process.env.MOCK_DEVICES == "true"){
-        this.logger.log({
-            event: "DEVICE_CONNECTION_TESTED",
-            uid: target.uid,
-            ok: true,
-        });
-        return { ok: true };
+    if (this.isMockDevicesEnabled()) {
+      this.logger.log({
+        event: "DEVICE_CONNECTION_TESTED",
+        uid: target.uid,
+        ok: true,
+        mode: "mock",
+      });
+      return { ok: true };
     }
     try {
       await firstValueFrom(
@@ -210,6 +215,10 @@ export class DevicesService {
       });
       return { ok: false };
     }
+  }
+
+  private isMockDevicesEnabled() {
+    return process.env.MOCK_DEVICES !== "false";
   }
 
   async getCommandLog(
