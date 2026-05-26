@@ -46,6 +46,14 @@ export function resolveControlDecision(
     };
   }
 
+  if (device.isCritical) {
+    return {
+      uid: device.uid,
+      targetState: true,
+      reason: "Critical device stays on",
+    };
+  }
+
   if (vacationMode && !device.isCritical) {
     return {
       uid: device.uid,

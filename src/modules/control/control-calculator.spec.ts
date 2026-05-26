@@ -34,14 +34,26 @@ describe("control calculator", () => {
     expect(decision.reason).toContain("within");
   });
 
-  it("keeps critical devices on during vacation mode when price allows it", () => {
+  it("keeps critical devices on during vacation mode even when price is high", () => {
     const decision = resolveControlDecision(
       { ...device, isCritical: true },
-      50,
+      500,
       true,
     );
 
     expect(decision.targetState).toBe(true);
+    expect(decision.reason).toContain("Critical");
+  });
+
+  it("does not switch critical devices off by price threshold", () => {
+    const decision = resolveControlDecision(
+      { ...device, isCritical: true },
+      500,
+      false,
+    );
+
+    expect(decision.targetState).toBe(true);
+    expect(decision.reason).toContain("Critical");
   });
 
   it("lets manual override win over price logic", () => {
